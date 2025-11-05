@@ -18,7 +18,7 @@ public final class BluetoothManager: NSObject, ObservableObject {
     
     @Published public var connectedDevices: [CBPeripheral] = []
     //@Published public private(set) var leftShoeData: Data?
-    //@Published public private(set) var rightShoeData: Data?
+    //@Published public private(set) var rightShoeData: Data? 
     
     public let connectionSubject = PassthroughSubject<CBPeripheral, Never>()
     
