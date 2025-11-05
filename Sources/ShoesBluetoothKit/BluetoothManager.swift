@@ -26,6 +26,7 @@ public final class BluetoothManager: NSObject, ObservableObject {
     public var isLogoutApplication : Bool = false
     public var isPeripheralConnectable: Bool = true
     public var deviceCharacteristics: [CBPeripheral: CBCharacteristic] = [:]
+    
     var cancellables = Set<AnyCancellable>()
     
     public let leftShoeDataPublisher = PassthroughSubject<Data, Never>()
