@@ -8,7 +8,7 @@
 import Foundation
 import CoreBluetooth
 import Combine
-
+ 
 public final class BluetoothManager: NSObject, ObservableObject {
     public static let shared = BluetoothManager()
     
