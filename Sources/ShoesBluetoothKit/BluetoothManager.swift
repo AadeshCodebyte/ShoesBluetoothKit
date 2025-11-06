@@ -8,64 +8,63 @@
 import Foundation
 import CoreBluetooth
 import Combine
- 
+
 public final class BluetoothManager: NSObject, ObservableObject {
     public static let shared = BluetoothManager()
     public weak var delegate: BluetoothManagerDelegate?
-
     private var centralManager: CBCentralManager!
+    public var deviceCharacteristics: [CBPeripheral: CBCharacteristic] = [:]
+    var cancellables = Set<AnyCancellable>()
     
     @Published public var discoveredDevices: [DiscoveredDevice] = []
-    
     @Published public var connectedDevices: [CBPeripheral] = []
     @Published public var observalAllowToSendData: Bool = false
+    @Published public var leftBattery : Int?
+    @Published public var rightBattery : Int?
     //@Published public private(set) var leftShoeData: Data?
-    //@Published public private(set) var rightShoeData: Data? 
+    //@Published public private(set) var rightShoeData: Data?
     
     public let connectionSubject = PassthroughSubject<CBPeripheral, Never>()
+    public var callWebSocket = PassthroughSubject<Void, Never>()
+    public var callWebSocketDisconnect = PassthroughSubject<Void, Never>()
+    public var leftShoeDataPublisher = PassthroughSubject<Data, Never>()
+    public var rightShoeDataPublisher = PassthroughSubject<Data, Never>()
     
+    private var reconnectQueue = DispatchQueue(label: "ReconnectQueue")
     private var arrDataDeviceName = ["own-l", "own-r"]
     
-    
     public var isLogoutApplication : Bool = false
-    public func updateLogoutState(_ value: Bool) {
-        isLogoutApplication = value
-        print("🔐 isLogoutApplication updated to \(value)")
-    }
     public var isPairingNewDevice : Bool = false
     public var hasExecutedleftShoesOnce : Bool = false
     public var allowToSendData : Bool = false
     public var pairedManually : Bool = false
-    
     public var isPeripheralConnectable: Bool = true
-    public var deviceCharacteristics: [CBPeripheral: CBCharacteristic] = [:]
-    
-    var cancellables = Set<AnyCancellable>()
-    
-    public var leftShoeDataPublisher = PassthroughSubject<Data, Never>()
-    public var rightShoeDataPublisher = PassthroughSubject<Data, Never>()
-    private var reconnectQueue = DispatchQueue(label: "ReconnectQueue")
     
     private override init() {
         super.init()
-        centralManager = CBCentralManager(delegate: self, queue: .main)
+        centralManager = CBCentralManager(delegate: self, queue: .main,options: [CBCentralManagerOptionRestoreIdentifierKey: "BluetoothRestoreID"])
+    }
+    
+    public func updateLogoutState(_ value: Bool) {
+        isLogoutApplication = value
+        print("🔐 isLogoutApplication updated to \(value)")
     }
     
     public func updatePairingState(_ value: Bool) {
         isPairingNewDevice = value
-        print("🔐 isLogoutApplication updated to \(value)")
+        print("🔐 value updated to \(value)")
     }
     public func hasExecutedleftShoes(_ value: Bool) {
         hasExecutedleftShoesOnce = value
-        print("🔐 isLogoutApplication updated to \(value)")
+        print("🔐 value updated to \(value)")
     }
     public func updateSendData(_ value: Bool) {
         allowToSendData = value
-        print("🔐 isLogoutApplication updated to \(value)")
+        print("🔐 value updated to \(value)")
     }
     public func updatepairedManually(_ value: Bool) {
         pairedManually = value
-        print("🔐 isLogoutApplication updated to \(value)")
+        print("🔐 value updated to \(value)")
     }
     
     // MARK: - Public Methods
@@ -90,6 +89,37 @@ public final class BluetoothManager: NSObject, ObservableObject {
     public func disconnectAllDevices() {
         connectedDevices.forEach { centralManager.cancelPeripheralConnection($0) }
         connectedDevices.removeAll()
+    }
+    
+    public func logout() {
+        isLogoutApplication = true
+        forceLogoutCleanup()
+    }
+    
+    public func forceLogoutCleanup() {
+        print("🔌 Force logout cleanup started")
+        
+        //leftCounter = 0
+        //rightCounter = 0
+        stopScanning()
+        disconnectAllDevices()
+        
+        connectedDevices.removeAll()
+        discoveredDevices.removeAll()
+        deviceCharacteristics.removeAll()
+        hasExecutedleftShoesOnce = false
+        
+        observalAllowToSendData = false
+        //leftShoesRawData = nil
+        //rightShoesRawData = nil
+        
+        leftBattery = 0
+        rightBattery = 0
+        
+        // Disconnect WebSocket
+        callWebSocketDisconnect.send(())
+        
+        print("🔌 Force logout cleanup complete")
     }
 }
 
@@ -150,36 +180,24 @@ extension BluetoothManager: CBCentralManagerDelegate {
             print("Bluetooth state changed: \(central.state.rawValue)")
         }
     }
+    //Test for all bluetooth devices
+    //        public func centralManager(_ central: CBCentralManager,
+    //                                   didDiscover peripheral: CBPeripheral,
+    //                                   advertisementData: [String : Any],
+    //                                   rssi RSSI: NSNumber) {
+    //
+    //            let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown"
+    //
+    //            //     // ✅ Discover all Bluetooth devices (for testing)
+    //                 let device = DiscoveredDevice(peripheral: peripheral, name: name, isConnected: false)
+    //                 if !discoveredDevices.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
+    //                 discoveredDevices.append(device)
+    //                 print("🟦 Discovered device: \(name)")
+    //                 }
+    //
+    //                 }
     
-    //    public func centralManager(_ central: CBCentralManager,
-    //                               didDiscover peripheral: CBPeripheral,
-    //                               advertisementData: [String : Any],
-    //                               rssi RSSI: NSNumber) {
-    //
-    //        let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown"
-    //
-    //        //     // ✅ Discover all Bluetooth devices (for testing)
-    //             let device = DiscoveredDevice(peripheral: peripheral, name: name, isConnected: false)
-    //             if !discoveredDevices.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
-    //             discoveredDevices.append(device)
-    //             print("🟦 Discovered device: \(name)")
-    //             }
-    //
-    //             }
     
-    
-    //    public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
-    //                        advertisementData: [String : Any], rssi RSSI: NSNumber) {
-    //        let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown"
-    //        guard name.lowercased().contains("own"), !name.lowercased().contains("unknown") else { return }
-    //
-    //        let newDevice = DiscoveredDevice(peripheral: peripheral, name: name, isConnected: false)
-    //        DispatchQueue.main.async {
-    //            if !self.discoveredDevices.contains(newDevice) {
-    //                self.discoveredDevices.append(newDevice)
-    //            }
-    //        }
-    //    }
     
     public func centralManager(_ central: CBCentralManager,
                                didDiscover peripheral: CBPeripheral,
@@ -247,13 +265,14 @@ extension BluetoothManager: CBCentralManagerDelegate {
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         peripheral.delegate = self
         peripheral.discoverServices(nil)
+        print("✅ Peripheral connected:", peripheral.name ?? "Unknown")
+        
         if !connectedDevices.contains(peripheral) {
             connectedDevices.append(peripheral)
             
             if connectedDevices.count > 1 {
-                print("WEBSOCKET CODE COMMENETED")
-                //webSocketManager.connectToWebSocket()
-                //                sendWriteCommandtoLeftShoes()
+                print("✅ Both shoes connected — notifying ViewModel")
+                callWebSocket.send(())
             }
         }
         
@@ -316,6 +335,8 @@ extension BluetoothManager: CBCentralManagerDelegate {
             }
         }
     }
+    
+    
 }
 extension BluetoothManager: CBPeripheralDelegate {
     //post connection
@@ -368,7 +389,7 @@ extension BluetoothManager: CBPeripheralDelegate {
                            error: Error?) {
         guard error == nil, let valueData = characteristic.value else { return }
         guard let stringValue = String(data: valueData, encoding: .utf8) else { return }
-       
+        
         if peripheral.name?.lowercased().contains("own-l") == true {
             //leftShoeData = data
             leftShoeDataPublisher.send(valueData) // 🔹 Send to project
@@ -378,6 +399,7 @@ extension BluetoothManager: CBPeripheralDelegate {
                 hasExecutedleftShoesOnce = true
             }
             let batteryLeft = extractBT(from:valueData)
+            leftBattery = batteryLeft ?? 0
             //BatteryStatusViewModel.shared.leftBattery = batteryLeft ?? 0
             print("stringValue Left: \(stringValue)")
             print("batteryLeft: \(batteryLeft)")
@@ -386,8 +408,10 @@ extension BluetoothManager: CBPeripheralDelegate {
             
         } else if peripheral.name?.lowercased().contains("own-r") == true {
             //rightShoeData = data
-            print("stringValue Right: \(stringValue)")
+            
             let batteryRight = extractBT(from:valueData)
+            rightBattery = batteryRight ?? 0
+            print("stringValue Right: \(stringValue)")
             print("batteryRight: \(batteryRight)")
             
             rightShoeDataPublisher.send(valueData) // 🔹 Send to project
