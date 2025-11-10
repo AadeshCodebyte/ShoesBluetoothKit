@@ -29,16 +29,18 @@ public final class BluetoothManager: NSObject, ObservableObject {
     public var callWebSocketDisconnect = PassthroughSubject<Void, Never>()
     public var leftShoeDataPublisher = PassthroughSubject<Data, Never>()
     public var rightShoeDataPublisher = PassthroughSubject<Data, Never>()
+    public var genericDeviceDataPublisher = PassthroughSubject<(CBPeripheral, Data), Never>()
+
     
     private var reconnectQueue = DispatchQueue(label: "ReconnectQueue")
     private var arrDataDeviceName = ["own-l", "own-r"]
     
     private var isLogoutApplication : Bool = false
     private var isPairingNewDevice : Bool = false
-    public var hasExecutedleftShoesOnce : Bool = false
-    public var allowToSendData : Bool = false
+    private var hasExecutedleftShoesOnce : Bool = false
+    private var allowToSendData : Bool = false
     private var pairedManually : Bool = false
-    public var isPeripheralConnectable: Bool = true
+    private var isPeripheralConnectable: Bool = true
     
     private override init() {
         super.init()
@@ -298,6 +300,10 @@ extension BluetoothManager: CBCentralManagerDelegate {
                 print("✅ Both shoes connected — notifying ViewModel")
                 callWebSocket.send(())
             }
+            else if connectedDevices.count == 1 {
+                print("✅ NON Own device connected — notifying ViewModel")
+                callWebSocket.send(())
+            }
         }
         
         print("connectedDevices: \(connectedDevices.map { $0.name ?? "Unnamed" })")
@@ -444,6 +450,9 @@ extension BluetoothManager: CBPeripheralDelegate {
             print("batteryRight: \(batteryRight)")
             
             rightShoeDataPublisher.send(valueData) // 🔹 Send to project
+        } else if peripheral.name != nil {
+            print("🟢 Non-OWN device data received from: \(peripheral.name ?? "Unknown")")
+            genericDeviceDataPublisher.send((peripheral, valueData))
         }
     }
     
