@@ -33,11 +33,11 @@ public final class BluetoothManager: NSObject, ObservableObject {
     private var reconnectQueue = DispatchQueue(label: "ReconnectQueue")
     private var arrDataDeviceName = ["own-l", "own-r"]
     
-    public var isLogoutApplication : Bool = false
-    public var isPairingNewDevice : Bool = false
+    private var isLogoutApplication : Bool = false
+    private var isPairingNewDevice : Bool = false
     public var hasExecutedleftShoesOnce : Bool = false
     public var allowToSendData : Bool = false
-    public var pairedManually : Bool = false
+    private var pairedManually : Bool = false
     public var isPeripheralConnectable: Bool = true
     
     private override init() {
@@ -52,19 +52,19 @@ public final class BluetoothManager: NSObject, ObservableObject {
     
     public func updatePairingState(_ value: Bool) {
         isPairingNewDevice = value
-        print("🔐 value updated to \(value)")
+        print("🔐 isPairingNewDevice value updated to \(value)")
     }
     public func hasExecutedleftShoes(_ value: Bool) {
         hasExecutedleftShoesOnce = value
-        print("🔐 value updated to \(value)")
+        print("🔐 hasExecutedleftShoesOnce value updated to \(value)")
     }
     public func updateSendData(_ value: Bool) {
         allowToSendData = value
-        print("🔐 value updated to \(value)")
+        print("🔐 allowToSendData value updated to \(value)")
     }
     public func updatepairedManually(_ value: Bool) {
         pairedManually = value
-        print("🔐 value updated to \(value)")
+        print("🔐 pairedManually value updated to \(value)")
     }
     
     // MARK: - Public Methods
@@ -98,6 +98,7 @@ public final class BluetoothManager: NSObject, ObservableObject {
     
     public func forceLogoutCleanup() {
         print("🔌 Force logout cleanup started")
+        
         
         //leftCounter = 0
         //rightCounter = 0
@@ -252,6 +253,16 @@ extension BluetoothManager: CBCentralManagerDelegate {
         let newDevice = DiscoveredDevice(peripheral: peripheral, name: advertisedName, isConnected: false)
         discoveredDevices.append(newDevice)
         
+        /// 🔴 Add this guard to prevent reconnect on logout:
+        if isLogoutApplication == true{
+            print("Skipping reconnect due to logout")
+            return
+        }
+        
+        if isPairingNewDevice {
+            print("⚠️ Skipping restore because user is pairing a new device")
+            return
+        }
         // 5️⃣ Connect based on match condition
         if matchedByServiceData || arrDataDeviceName.contains(where: { lowercasedName.contains($0.lowercased()) }) {
             if connectedDevices.count <= 2, !pairedManually {
