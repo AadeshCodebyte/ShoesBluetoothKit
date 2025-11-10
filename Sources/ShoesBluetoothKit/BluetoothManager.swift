@@ -367,13 +367,16 @@ extension BluetoothManager: CBPeripheralDelegate {
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
         guard let services = peripheral.services else { return }
         for service in services {
+            print("Service UUID:", service.uuid)
             peripheral.discoverCharacteristics(nil, for: service)
         }
     }
     
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
         guard error == nil, let characteristics = service.characteristics else { return }
-        
+        for char in characteristics ?? [] {
+            print("Characteristic UUID:", char.uuid, "Properties:", char.properties)
+        }
         // Iterate over all characteristics
         for char in characteristics {
             peripheral.setNotifyValue(true, for: char)
