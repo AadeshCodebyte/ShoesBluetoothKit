@@ -182,21 +182,27 @@ extension BluetoothManager: CBCentralManagerDelegate {
         }
     }
     //Test for all bluetooth devices
-    //        public func centralManager(_ central: CBCentralManager,
-    //                                   didDiscover peripheral: CBPeripheral,
-    //                                   advertisementData: [String : Any],
-    //                                   rssi RSSI: NSNumber) {
-    //
-    //            let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown"
-    //
-    //            //     // ✅ Discover all Bluetooth devices (for testing)
-    //                 let device = DiscoveredDevice(peripheral: peripheral, name: name, isConnected: false)
-    //                 if !discoveredDevices.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
-    //                 discoveredDevices.append(device)
-    //                 print("🟦 Discovered device: \(name)")
-    //                 }
-    //
-    //                 }
+//        public func centralManager(_ central: CBCentralManager,
+//                                   didDiscover peripheral: CBPeripheral,
+//                                   advertisementData: [String : Any],
+//                                   rssi RSSI: NSNumber) {
+//    
+//            if isLogoutApplication == true{
+//                print("Skipping reconnect due to logout")
+//                return
+//            }
+//    
+//    
+//            let name = advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name ?? "Unknown"
+//                guard name.lowercased() != "unknown" else { return }
+//                
+//                if !discoveredDevices.contains(where: { $0.peripheral.identifier == peripheral.identifier }) {
+//                    let device = DiscoveredDevice(peripheral: peripheral, name: name, isConnected: false)
+//                    discoveredDevices.append(device)
+//                    print("🟦 Discovered device: \(name) (RSSI: \(RSSI))")
+//                }
+//    
+//        }
     
     
     
@@ -244,7 +250,7 @@ extension BluetoothManager: CBCentralManagerDelegate {
         ?? "Unknown"
         
         let lowercasedName = advertisedName.lowercased()
-        guard lowercasedName.contains("own"), !lowercasedName.contains("unknown") else { return }
+        guard !lowercasedName.contains("unknown") else { return }
         
         guard !discoveredDevices.contains(where: { $0.peripheral.identifier == peripheral.identifier }) else { return }
         
@@ -264,12 +270,19 @@ extension BluetoothManager: CBCentralManagerDelegate {
             return
         }
         // 5️⃣ Connect based on match condition
-        if matchedByServiceData || arrDataDeviceName.contains(where: { lowercasedName.contains($0.lowercased()) }) {
-            if connectedDevices.count <= 2, !pairedManually {
-                print("🔗 Connecting to \(advertisedName) because of serviceData or name match")
+        if lowercasedName.contains("own") {
+                // ✅ Follow existing flow for "own" devices
+                if matchedByServiceData || arrDataDeviceName.contains(where: { lowercasedName.contains($0.lowercased()) }) {
+                    if connectedDevices.count <= 2, !pairedManually {
+                        print("🔗 Connecting to \(advertisedName) (OWN device)")
+                        central.connect(peripheral, options: nil)
+                    }
+                }
+            } else {
+                // 🔹 For non-OWN devices: connect normally so data can still be received
+                print("🔹 Connecting to non-OWN device: \(advertisedName)")
                 central.connect(peripheral, options: nil)
             }
-        }
     }
     
     
@@ -384,11 +397,13 @@ extension BluetoothManager: CBPeripheralDelegate {
                     
                     // Write command only once per peripheral if applicable
                     if let command = command {
+                        let demoMessage = "Hello from iPhone 👟"
                         let dataToSend = Data(command.utf8)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                             self.writeData(to: matchedDevice, characteristic: char, data: dataToSend)
                         }
                         print("✅ command Sent \(command) to \(name)")
+                        print("📤 Sent demo data to \(name): \(demoMessage)")
                     }
                 }
             }
