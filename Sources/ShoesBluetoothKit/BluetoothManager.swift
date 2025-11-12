@@ -47,6 +47,10 @@ public final class BluetoothManager: NSObject, ObservableObject {
         centralManager = CBCentralManager(delegate: self, queue: .main,options: [CBCentralManagerOptionRestoreIdentifierKey: "BluetoothRestoreID"])
     }
     
+    public var centralManagerState: CBManagerState {
+        return centralManager.state
+    }
+
     public func updateLogoutState(_ value: Bool) {
         isLogoutApplication = value
         print("🔐 isLogoutApplication updated to \(value)")
